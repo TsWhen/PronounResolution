@@ -1,0 +1,139 @@
+import numpy as np
+import pandas as pd
+
+from keras import models,layers,initializers,regularizers,constraints,optimizers
+from keras import callbacks
+from keras import optimizers
+from keras.utils import plot_model
+
+from sklearn.model_selection import cross_val_score,KFold,train_test_split
+from sklearn.metrics import log_loss
+
+def parse_json(embedding_df):
+
+    embedding_df.sort_index(inplace=True)
+
+    X_data = np.zeros((len(embedding_df),3*1024))
+    Y_data = np.zeros((len(embedding_df),3))
+
+    # 构建特征数据
+    for i in range(len(embedding_df)):
+
+        A_embedding = np.array(embedding_df.loc[i,"A_embedding"])
+        B_embedding = np.array(embedding_df.loc[i, "B_embedding"])
+        P_embedding = np.array(embedding_df.loc[i, "P_embedding"])
+        X_data[i] = np.concatenate((A_embedding,B_embedding,P_embedding))
+
+    # 构建标签数据
+    for i in range(len(embedding_df)):
+
+        label = embedding_df.loc[i,"label"]
+
+        if label == "A":
+            Y_data[i,0] = 1
+        elif label == "B":
+            Y_data[i,1] = 1
+        else:
+            Y_data[i,2] = 1
+
+    return X_data,Y_data
+
+def get_train_data(layer_num):
+
+    model_version = "bert-large-uncased-seq300-"
+    model_layer = model_version + str(layer_num)
+
+    develop_data = pd.read_json("./data/vector/{}contextual_embedding_gap_develop.json".format(model_layer))
+    X_develop,Y_develop = parse_json(develop_data)
+
+    val_data = pd.read_json("./data/vector/{}contextual_embedding_gap_val.json".format(model_layer))
+    X_val, Y_val = parse_json(val_data)
+
+    test_data = pd.read_json("./data/vector/{}contextual_embedding_gap_test.json".format(model_layer))
+    X_test, Y_test = parse_json(test_data)
+
+    # 存在少量句子长度大于bert的最大句子长度导致的NaN值，将其删去
+    remove_develop = [row for row in range(len(X_develop)) if np.sum(np.isnan(X_develop[row]))]
+    X_develop[remove_develop] = np.zeros(3*1024)
+
+    remove_val = [row for row in range(len(X_val)) if np.sum(np.isnan(X_val[row]))]
+    X_val = np.delete(X_val,remove_val,0)
+    Y_val = np.delete(Y_val, remove_val, 0)
+
+    remove_test = [row for row in range(len(X_test)) if np.sum(np.isnan(X_test[row]))]
+    X_test = np.delete(X_test, remove_test, 0)
+    Y_test = np.delete(Y_test, remove_test, 0)
+
+    # 构造训练集、测试集
+    X_train = np.concatenate((X_test,X_val),axis=0)
+    Y_train = np.concatenate((Y_test,Y_val),axis=0)
+
+    return X_train,Y_train,X_develop,Y_develop
+
+def gen_model_net(input_size,embedding_size=1024,dropout_rate=0.6,dense_layer_size=37,lambd=0.1):
+
+    input = layers.Input(input_size)
+
+    # 输入数据切片，分为三个输入
+    input_A = layers.Lambda(lambda x:x[:,:embedding_size])(input)
+    input_B = layers.Lambda(lambda x:x[:,embedding_size:embedding_size*2])(input)
+    input_P = layers.Lambda(lambda x:x[:,embedding_size*2:])(input)
+
+    # head_num = 6
+    # result = []
+    #
+    # for head in range(head_num):
+
+    query_encode = layers.Dense(dense_layer_size,activation='selu',kernel_regularizer=regularizers.l2(lambd))
+    answer_encode = layers.Dense(dense_layer_size, activation='selu', kernel_regularizer=regularizers.l2(lambd))
+
+    a = query_encode(layers.Dropout(dropout_rate)(input_A))
+    b = query_encode(layers.Dropout(dropout_rate)(input_B))
+    p = query_encode(layers.Dropout(dropout_rate)(input_P))
+
+    A_P_mul = layers.Multiply()([a,p])
+    B_P_mul = layers.Multiply()([b,p])
+
+    A_P_sub = layers.Lambda(lambda vector: vector[0] - vector[1])([p,a])
+    B_P_sub = layers.Lambda(lambda vector: vector[0] - vector[1])([p, b])
+
+    ia = layers.Concatenate()([a,p,A_P_mul,A_P_sub])
+    ib = layers.Concatenate()([b,p,B_P_mul,B_P_sub])
+
+    nli_encoder = layers.Dense(dense_layer_size,activation='selu')
+    ia = nli_encoder(ia)
+    ib = nli_encoder(ib)
+
+    out = layers.Concatenate()([ia,ib])
+    out = layers.Dropout(0.85)(out)
+    out = layers.Dense(dense_layer_size,name='dense0')(out)
+    out = layers.BatchNormalization(name='bn0')(out)
+    out = layers.Activation('relu')(out)
+    out = layers.Dropout(0.6,seed=7)(out)
+
+    out = layers.Dense(3,name='output',kernel_regularizer=regularizers.l2(lambd))(out)
+    out = layers.Activation('softmax')(out)
+
+    return models.Model(input=input,output=out,name="nli_model")
+
+class NLI_model():
+
+    def __init__(self,dropout_rate=0.7,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
+
+        pass
+
+    def train(self):
+
+        input
+
+
+if __name__ == "__main__":
+
+
+    # import pydot_ng
+    #
+    # pydot_ng.find_graphviz()
+    X,Y,x,y = get_train_data(18)
+    model = gen_model_net(input_size=[X.shape[-1]])
+    # model = gen_model_net([4000])
+    plot_model(model,to_file='model_net.png')
