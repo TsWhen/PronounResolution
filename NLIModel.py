@@ -40,7 +40,7 @@ def parse_json(embedding_df):
 
 def get_train_data_stage_one(layer_num):
 
-    model_version = "bert-large-uncased-seq300-"
+    model_version = "aug_bert-large-uncased-seq300-"
     model_layer = model_version + str(layer_num)
 
     develop_data = pd.read_json("./data/vector/{}contextual_embedding_gap_develop.json".format(model_layer))
@@ -123,7 +123,7 @@ class NLI_model():
 
         self.X_train, self.Y_train, self.X_pred, self.Y_pred = get_train_data_stage_one(bert_layer_num)
         self.bert_layer_num = bert_layer_num
-        self.mlp_model = gen_model_net(input_size=[self.X_train.shape[-1]], dropout_rate=dropout_rate, dense_layer_size=37,
+        self.mlp_model = gen_model_net(input_size=[self.X_train.shape[-1]], dropout_rate=dropout_rate, dense_layer_size=128,
                                      lambd=lambd)
         self.lr = lr
         self.n_fold = n_fold

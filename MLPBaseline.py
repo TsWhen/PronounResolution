@@ -47,7 +47,7 @@ def parse_json(embedding_df):
 # 获取训练数据
 def get_train_data(layer_num):
 
-    model_version = "bert-large-uncased-seq300-"
+    model_version = "aug_bert-large-uncased-seq300-"
     model_layer = model_version + str(layer_num)
 
     develop_data = pd.read_json("./data/vector/{}contextual_embedding_gap_develop.json".format(model_layer))
@@ -77,7 +77,7 @@ def get_train_data(layer_num):
 
     return X_train,Y_train,X_develop,Y_develop
 
-
+# 模型结构搭建
 def gen_MLP_net(input_size,dropout_rate=0.6,dense_layer_size=37,lambd=0.1):
 
     input = layers.Input(input_size)

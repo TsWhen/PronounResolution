@@ -138,24 +138,51 @@ def gen_embedding(start_layer,end_layer):
 
     for i in range(start_layer,end_layer):
 
-        model_version = "bert-large-uncased-seq300-"
+        model_version = "aug_bert-large-uncased-seq300-"
         embedding_size = 1024
         layer = i
         model_layer = model_version + str(i)
         
         
-        gap_test_data = pd.read_csv("./data/gap-test.tsv",sep='\t')
+        # gap_test_data = pd.read_csv("./data/gap-test.tsv",sep='\t')
+        test_naive_data = pd.read_csv("./data/gap-test.tsv",sep='\t')
+        test_aug_1_data = pd.read_csv("./data/test_augment_data_1.tsv",sep='\t')
+        test_aug_2_data = pd.read_csv("./data/test_augment_data_2.tsv", sep='\t')
+        test_aug_3_data = pd.read_csv("./data/test_augment_data_3.tsv", sep='\t')
+        test_aug_4_data = pd.read_csv("./data/test_augment_data_4.tsv", sep='\t')
+
+        gap_test_data = test_naive_data.append([test_aug_1_data,test_aug_2_data,test_aug_3_data,test_aug_4_data])
+        print(gap_test_data)
+
         test_embedding_df = train_bert_embedding(gap_test_data,output="{}contextual_embedding_gap_test.json".format(model_layer),layer_num=layer)
         test_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_test.json".format(model_layer),orient="columns")
 
-        gap_val_data = pd.read_csv("./data/gap-validation.tsv", sep='\t')
+        # gap_val_data = pd.read_csv("./data/gap-validation.tsv", sep='\t')
+        val_naive_data = pd.read_csv("./data/gap-validation.tsv", sep='\t')
+        val_aug_1_data = pd.read_csv("./data/val_augment_data_1.tsv", sep='\t')
+        val_aug_2_data = pd.read_csv("./data/val_augment_data_2.tsv", sep='\t')
+        val_aug_3_data = pd.read_csv("./data/val_augment_data_3.tsv", sep='\t')
+        val_aug_4_data = pd.read_csv("./data/val_augment_data_4.tsv", sep='\t')
+
+        gap_val_data = val_naive_data.append([val_aug_1_data, val_aug_2_data, val_aug_3_data, val_aug_4_data])
+        print(gap_val_data)
         val_embedding_df = train_bert_embedding(gap_val_data,
                                            output="{}contextual_embedding_gap_val.json".format(model_layer),
                                            layer_num=layer)
         val_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_val.json".format(model_layer),
                                   orient="columns")
 
-        gap_develop_data = pd.read_csv("./data/gap-development.tsv", sep='\t')
+        # gap_develop_data = pd.read_csv("./data/gap-development.tsv", sep='\t')
+
+        develop_naive_data = pd.read_csv("./data/gap-development.tsv", sep='\t')
+        develop_aug_1_data = pd.read_csv("./data/develop_augment_data_1.tsv", sep='\t')
+        develop_aug_2_data = pd.read_csv("./data/develop_augment_data_2.tsv", sep='\t')
+        develop_aug_3_data = pd.read_csv("./data/develop_augment_data_3.tsv", sep='\t')
+        develop_aug_4_data = pd.read_csv("./data/develop_augment_data_4.tsv", sep='\t')
+
+        gap_develop_data = develop_naive_data.append([develop_aug_1_data, develop_aug_2_data, develop_aug_3_data, develop_aug_4_data])
+        print(gap_develop_data)
+
         develop_embedding_df = train_bert_embedding(gap_develop_data,
                                            output="{}contextual_embedding_gap_develop.json".format(model_layer),
                                            layer_num=layer)
@@ -168,4 +195,4 @@ def gen_embedding(start_layer,end_layer):
 if __name__ == '__main__':
 
     print("开始时间:",time.ctime())
-    gen_embedding(17,21)
+    gen_embedding(18,21)
