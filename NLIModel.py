@@ -38,7 +38,7 @@ def parse_json(embedding_df):
 
     return X_data,Y_data
 
-def get_train_data(layer_num):
+def get_train_data_stage_one(layer_num):
 
     model_version = "bert-large-uncased-seq300-"
     model_layer = model_version + str(layer_num)
@@ -69,6 +69,7 @@ def get_train_data(layer_num):
     Y_train = np.concatenate((Y_test,Y_val),axis=0)
 
     return X_train,Y_train,X_develop,Y_develop
+
 
 def gen_model_net(input_size,embedding_size=1024,dropout_rate=0.6,dense_layer_size=37,lambd=0.1):
 
@@ -118,13 +119,58 @@ def gen_model_net(input_size,embedding_size=1024,dropout_rate=0.6,dense_layer_si
 
 class NLI_model():
 
-    def __init__(self,dropout_rate=0.7,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
+    def __init__(self,bert_layer_num,dropout_rate=0.7,lr=0.001,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
 
-        pass
+        self.X_train, self.Y_train, self.X_pred, self.Y_pred = get_train_data_stage_one(bert_layer_num)
+        self.bert_layer_num = bert_layer_num
+        self.mlp_model = gen_model_net(input_size=[self.X_train.shape[-1]], dropout_rate=dropout_rate, dense_layer_size=37,
+                                     lambd=lambd)
+        self.lr = lr
+        self.n_fold = n_fold
+        self.batch_size = batch_size
+        self.epoch_num = epoch_num
+        self.patience = patience
+
+        # 编译模型
+        self.mlp_model.compile(optimizer=optimizers.Adam(lr=self.lr), loss="categorical_crossentropy")
 
     def train(self):
 
-        input
+        folds = KFold(n_splits=self.n_fold, shuffle=True, random_state=2)
+
+        tmp_val_pred = np.zeros_like(self.Y_train)
+        val_score_lsit = []
+        pred_result = np.zeros((len(self.X_pred), 3))
+
+        for fold_num, (train_index, valid_index) in enumerate(folds.split(self.X_train)):
+            # 划分训练集、验证集
+            train_X, val_X = self.X_train[train_index], self.X_train[valid_index]
+            train_Y, val_Y = self.Y_train[train_index], self.Y_train[valid_index]
+
+            callback = [callbacks.EarlyStopping(monitor='val_loss', patience=self.patience, restore_best_weights=False),
+                        callbacks.ModelCheckpoint(
+                            './model/bert-large-uncased-seq300-' + str(self.bert_layer_num) + '-' + str(
+                                self.n_fold) + '.pt',
+                            monitor='val_loss', verbose=0, save_best_only=True, mode='min')]
+
+            self.mlp_model.fit(x=train_X, y=train_Y, epochs=self.epoch_num, batch_size=self.batch_size,
+                               callbacks=callback, validation_data=(val_X, val_Y), verbose=0)
+
+            pred_valid = self.mlp_model.predict(x=val_X, verbose=0)
+            tmp_val_pred[valid_index] = pred_valid
+
+            pred_test = self.mlp_model.predict(x=self.X_pred, verbose=0)
+
+            val_score_lsit.append(log_loss(val_Y, pred_valid))
+
+            pred_result += pred_test
+
+        pred_result /= self.n_fold
+
+        print("laye " + str(self.bert_layer_num) + " :")
+        print("CV mean score:{0:.4f},std: {1:.4f}".format(np.mean(val_score_lsit), np.std(val_score_lsit)))
+        print(val_score_lsit)
+        print("pred score:", log_loss(self.Y_pred, pred_result))
 
 
 if __name__ == "__main__":
@@ -133,7 +179,10 @@ if __name__ == "__main__":
     # import pydot_ng
     #
     # pydot_ng.find_graphviz()
-    X,Y,x,y = get_train_data(18)
-    model = gen_model_net(input_size=[X.shape[-1]])
-    # model = gen_model_net([4000])
-    plot_model(model,to_file='model_net.png')
+    # X,Y,x,y = get_train_data(18)
+    # model = gen_model_net(input_size=[X.shape[-1]])
+    # # model = gen_model_net([4000])
+    # plot_model(model,to_file='model_net.png')
+
+    model = NLI_model(19)
+    model.train()
