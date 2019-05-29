@@ -12,7 +12,7 @@ def data_augment(data_file_path,output_tag):
                          {"male":['Henry','John'],"female":['Mary','Alice']}]
 
     aug_count = 1
-
+    naive_data = pd.read_csv(data_file_path,sep='\t')
     for name_dict in replace_name_list:
 
         data = pd.read_csv(data_file_path,sep='\t')
@@ -115,8 +115,11 @@ def data_augment(data_file_path,output_tag):
             assert gap_text[B_offset:(B_offset + len(B))] == B
             assert gap_text[P_offset:(P_offset + len(P))] == P
 
-        data.to_csv("./data/"+output_tag+"_augment_data_"+str(aug_count)+".tsv",sep='\t',index=False)
-        aug_count += 1
+        # data.to_csv("./data/"+output_tag+"_augment_data_"+str(aug_count)+".tsv",sep='\t',index=False)
+        # aug_count += 1
+        naive_data = naive_data.append(data)
+
+    naive_data.to_csv("./data/" + output_tag + "_augment_data" + ".tsv", sep='\t', index=False)
 
 if __name__ == "__main__":
 

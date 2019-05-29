@@ -47,7 +47,7 @@ def parse_json(embedding_df):
 # 获取训练数据
 def get_train_data(layer_num):
 
-    model_version = "aug_bert-large-uncased-seq300-"
+    model_version = "bert-large-uncased-seq300-"
     model_layer = model_version + str(layer_num)
 
     develop_data = pd.read_json("./data/vector/{}contextual_embedding_gap_develop.json".format(model_layer))
@@ -146,6 +146,29 @@ class MLP_model():
         print("CV mean score:{0:.4f},std: {1:.4f}".format(np.mean(val_score_lsit),np.std(val_score_lsit)))
         print(val_score_lsit)
         print("pred score:", log_loss(self.Y_pred,pred_result))
+
+    def prediction(self,pred_file_path,model_path='./model/'):
+
+        naive_data = pd.read_json(pred_file_path)
+        X_pred,Y_pred = parse_json(naive_data)
+
+        pred_result = np.zeros((len(X_pred),3))
+
+        for fold_num in range(self.n_fold):
+
+            self.mlp_model = gen_MLP_net(input_size=[X_pred.shape[-1]],embedding_size=self.embedding_size)
+            self.mlp_model.load_weights(model_path)
+
+            pred_data = self.mlp_model.predict(x=X_pred,verbose=0)
+            pred_result += pred_data
+
+        pred_result /= self.n_fold
+
+        submission_data = pd.read_csv("./data/sample_submission_stage_2.csv",index_col="ID")
+        submission_data["A"] = pred_result[:,0]
+        submission_data["B"] = pred_result[:,1]
+        submission_data["NEITHER"] = pred_result[:,2]
+        submission_data.to_csv("./data/NLI_pred_submission.csv")
 
 if __name__ == '__main__':
 

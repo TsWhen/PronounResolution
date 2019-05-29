@@ -44,18 +44,20 @@ def get_count_lenght_no_special(gap_text):
     return count
 
 # 利用bert获取GAP数据集上的word embedding
-def train_bert_embedding(data,output,embedding_size=1024,layer_num=-1):
+def train_bert_embedding(data,output,extract_command,embedding_size=1024,layer_num=-1):
 
     gap_text = data["Text"]
     gap_text.to_csv("input.csv",index=False,header=False)
 
     # 执行extract_features.py获取对应层输出
-    os.system("python3 extract_features.py --input_file=input.csv --output_file=output.json \
-                        --vocab_file=./data/uncased_L-24_H-1024_A-16/vocab.txt \
-                        --bert_config_file=./data/uncased_L-24_H-1024_A-16/bert_config.json \
-                        --init_checkpoint=./data/uncased_L-24_H-1024_A-16/bert_model.ckpt \
-                        --layers={} --max_seq_length=300 --batch_size=1".format(layer_num)
-                       )
+    # os.system("python3 extract_features.py --input_file=input.csv --output_file=output.json \
+    #                     --vocab_file=./data/uncased_L-24_H-1024_A-16/vocab.txt \
+    #                     --bert_config_file=./data/uncased_L-24_H-1024_A-16/bert_config.json \
+    #                     --init_checkpoint=./data/uncased_L-24_H-1024_A-16/bert_model.ckpt \
+    #                     --layers={} --max_seq_length=300 --batch_size=1".format(layer_num)
+    #                    )
+
+    os.system(extract_command)
 
     bert_output = pd.read_json('output.json',lines=True)
 
@@ -142,57 +144,65 @@ def gen_embedding(start_layer,end_layer):
         embedding_size = 1024
         layer = i
         model_layer = model_version + str(i)
-        
-        
-        # gap_test_data = pd.read_csv("./data/gap-test.tsv",sep='\t')
-        test_naive_data = pd.read_csv("./data/gap-test.tsv",sep='\t')
-        test_aug_1_data = pd.read_csv("./data/test_augment_data_1.tsv",sep='\t')
-        test_aug_2_data = pd.read_csv("./data/test_augment_data_2.tsv", sep='\t')
-        test_aug_3_data = pd.read_csv("./data/test_augment_data_3.tsv", sep='\t')
-        test_aug_4_data = pd.read_csv("./data/test_augment_data_4.tsv", sep='\t')
 
-        gap_test_data = test_naive_data.append([test_aug_1_data,test_aug_2_data,test_aug_3_data,test_aug_4_data])
-        print(gap_test_data)
+        extract_command = "python3 extract_features.py --input_file=input.csv --output_file=output.json \
+                        --vocab_file=./data/uncased_L-24_H-1024_A-16/vocab.txt \
+                        --bert_config_file=./data/uncased_L-24_H-1024_A-16/bert_config.json \
+                        --init_checkpoint=./data/uncased_L-24_H-1024_A-16/bert_model.ckpt \
+                        --layers={} --max_seq_length=300 --batch_size=1".format(i)
 
-        test_embedding_df = train_bert_embedding(gap_test_data,output="{}contextual_embedding_gap_test.json".format(model_layer),layer_num=layer)
-        test_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_test.json".format(model_layer),orient="columns")
+        # # gap_test file
+        # gap_test_data = pd.read_csv("./data/test_augment_data.tsv",sep='\t')
+        # print(gap_test_data)
+        #
+        # test_embedding_df = train_bert_embedding(gap_test_data,output="{}contextual_embedding_gap_test.json".format(model_layer),
+        #                                          extract_command = extract_command,layer_num=layer)
+        # test_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_test.json".format(model_layer),orient="columns")
+        #
+        # # gap_val file
+        # gap_val_data = pd.read_csv("./data/val_augment_data.tsv", sep='\t')
+        # print(gap_val_data)
+        #
+        # val_embedding_df = train_bert_embedding(gap_val_data,
+        #                                    output="{}contextual_embedding_gap_val.json".format(model_layer),
+        #                                    extract_command = extract_command,
+        #                                         layer_num=layer)
+        # val_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_val.json".format(model_layer),
+        #                           orient="columns")
+        #
+        # # # gap_develop file
+        # gap_develop_data = pd.read_csv("./data/develop_augment_data.tsv", sep='\t')
+        # print(gap_develop_data)
+        #
+        # develop_embedding_df = train_bert_embedding(gap_develop_data,
+        #                                    output="{}contextual_embedding_gap_develop.json".format(model_layer),
+        #                                    extract_command=extract_command,
+        #                                    layer_num=layer)
+        # develop_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_develop.json".format(model_layer),
+        #                           orient="columns")
 
-        # gap_val_data = pd.read_csv("./data/gap-validation.tsv", sep='\t')
-        val_naive_data = pd.read_csv("./data/gap-validation.tsv", sep='\t')
-        val_aug_1_data = pd.read_csv("./data/val_augment_data_1.tsv", sep='\t')
-        val_aug_2_data = pd.read_csv("./data/val_augment_data_2.tsv", sep='\t')
-        val_aug_3_data = pd.read_csv("./data/val_augment_data_3.tsv", sep='\t')
-        val_aug_4_data = pd.read_csv("./data/val_augment_data_4.tsv", sep='\t')
+        # 第二阶段预测数据
+        gap_pred_data = pd.read_csv("./data/test_stage_2.tsv",sep='\t')
+        gap_pred_data['A-coref'] = False
+        gap_pred_data['B-coref'] = False
+        gap_pred_data['ID'] = 'development' + gap_pred_data["ID"]
+        print((gap_pred_data))
 
-        gap_val_data = val_naive_data.append([val_aug_1_data, val_aug_2_data, val_aug_3_data, val_aug_4_data])
-        print(gap_val_data)
-        val_embedding_df = train_bert_embedding(gap_val_data,
-                                           output="{}contextual_embedding_gap_val.json".format(model_layer),
-                                           layer_num=layer)
-        val_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_val.json".format(model_layer),
-                                  orient="columns")
-
-        # gap_develop_data = pd.read_csv("./data/gap-development.tsv", sep='\t')
-
-        develop_naive_data = pd.read_csv("./data/gap-development.tsv", sep='\t')
-        develop_aug_1_data = pd.read_csv("./data/develop_augment_data_1.tsv", sep='\t')
-        develop_aug_2_data = pd.read_csv("./data/develop_augment_data_2.tsv", sep='\t')
-        develop_aug_3_data = pd.read_csv("./data/develop_augment_data_3.tsv", sep='\t')
-        develop_aug_4_data = pd.read_csv("./data/develop_augment_data_4.tsv", sep='\t')
-
-        gap_develop_data = develop_naive_data.append([develop_aug_1_data, develop_aug_2_data, develop_aug_3_data, develop_aug_4_data])
-        print(gap_develop_data)
-
-        develop_embedding_df = train_bert_embedding(gap_develop_data,
-                                           output="{}contextual_embedding_gap_develop.json".format(model_layer),
-                                           layer_num=layer)
-        develop_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_develop.json".format(model_layer),
-                                  orient="columns")
-        
-        
-
+        pred_embedding_df = train_bert_embedding(gap_pred_data,
+                                                 output="{}contextual_embedding_gap_pred.json".format(model_layer),
+                                                 extract_command=extract_command,
+                                                 layer_num=layer)
+        pred_embedding_df.to_json("./data/vector/{}contextual_embedding_gap_pred.json".format(model_layer),
+                                     orient="columns")
 #
 if __name__ == '__main__':
 
     print("开始时间:",time.ctime())
     gen_embedding(18,21)
+    # test_naive_data = pd.read_csv("./data/gap-test.tsv", sep='\t')
+    # print(type(test_naive_data.loc[0, "Pronoun"]))
+    # print(      test_naive_data.loc[0, "Pronoun"])
+    # test_aug_1_data = pd.read_csv("./data/test_augment_data_1.tsv", sep='\t')
+    # gap_test_data = test_naive_data.append(test_aug_1_data)
+    # print(gap_test_data.loc[0, "Pronoun"])
+    # print(type(gap_test_data.loc[0,"Pronoun"]))

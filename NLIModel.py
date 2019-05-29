@@ -119,13 +119,14 @@ def gen_model_net(input_size,embedding_size=1024,dropout_rate=0.6,dense_layer_si
 
 class NLI_model():
 
-    def __init__(self,bert_layer_num,dropout_rate=0.7,lr=0.001,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
+    def __init__(self,bert_layer_num,embedding_size=1024,dropout_rate=0.7,lr=0.001,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
 
         self.X_train, self.Y_train, self.X_pred, self.Y_pred = get_train_data_stage_one(bert_layer_num)
         self.bert_layer_num = bert_layer_num
         self.mlp_model = gen_model_net(input_size=[self.X_train.shape[-1]], dropout_rate=dropout_rate, dense_layer_size=128,
                                      lambd=lambd)
         self.lr = lr
+        self.embedding_size = embedding_size
         self.n_fold = n_fold
         self.batch_size = batch_size
         self.epoch_num = epoch_num
@@ -172,6 +173,28 @@ class NLI_model():
         print(val_score_lsit)
         print("pred score:", log_loss(self.Y_pred, pred_result))
 
+    def prediction(self,pred_file_path,model_path='./model/'):
+
+        naive_data = pd.read_json(pred_file_path)
+        X_pred,Y_pred = parse_json(naive_data)
+
+        pred_result = np.zeros((len(X_pred),3))
+
+        for fold_num in range(self.n_fold):
+
+            self.mlp_model = gen_model_net(input_size=[X_pred.shape[-1]],embedding_size=self.embedding_size)
+            self.mlp_model.load_weights(model_path)
+
+            pred_data = self.mlp_model.predict(x=X_pred,verbose=0)
+            pred_result += pred_data
+
+        pred_result /= self.n_fold
+
+        submission_data = pd.read_csv("./data/sample_submission_stage_2.csv",index_col="ID")
+        submission_data["A"] = pred_result[:,0]
+        submission_data["B"] = pred_result[:,1]
+        submission_data["NEITHER"] = pred_result[:,2]
+        submission_data.to_csv("./data/NLI_pred_submission.csv")
 
 if __name__ == "__main__":
 
