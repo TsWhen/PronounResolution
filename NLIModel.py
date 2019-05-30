@@ -71,7 +71,7 @@ def get_train_data_stage_one(layer_num):
     return X_train,Y_train,X_develop,Y_develop
 
 
-def gen_model_net(input_size,embedding_size=1024,dropout_rate=0.6,dense_layer_size=37,lambd=0.1):
+def gen_model_net(input_size,embedding_size=1024,dropout_rate=0.6,dense_layer_size=32,lambd=0.1):
 
     input = layers.Input(input_size)
 
@@ -119,18 +119,22 @@ def gen_model_net(input_size,embedding_size=1024,dropout_rate=0.6,dense_layer_si
 
 class NLI_model():
 
-    def __init__(self,bert_layer_num,embedding_size=1024,dropout_rate=0.7,lr=0.001,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
+    def __init__(self,bert_layer_num=19,dense_layer_size=32,embedding_size=1024,dropout_rate=0.7,lr=0.001,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
 
         self.X_train, self.Y_train, self.X_pred, self.Y_pred = get_train_data_stage_one(bert_layer_num)
         self.bert_layer_num = bert_layer_num
-        self.mlp_model = gen_model_net(input_size=[self.X_train.shape[-1]], dropout_rate=dropout_rate, dense_layer_size=128,
-                                     lambd=lambd)
+        self.dense_layer_size = dense_layer_size
         self.lr = lr
         self.embedding_size = embedding_size
         self.n_fold = n_fold
         self.batch_size = batch_size
         self.epoch_num = epoch_num
         self.patience = patience
+        self.dropout_rate = dropout_rate
+        self.lambd = lambd
+        self.mlp_model = gen_model_net(input_size=[self.X_train.shape[-1]], dropout_rate=self.dropout_rate,
+                                       dense_layer_size=self.dense_layer_size,
+                                       lambd=self.lambd)
 
         # 编译模型
         self.mlp_model.compile(optimizer=optimizers.Adam(lr=self.lr), loss="categorical_crossentropy")
@@ -173,7 +177,7 @@ class NLI_model():
         print(val_score_lsit)
         print("pred score:", log_loss(self.Y_pred, pred_result))
 
-    def prediction(self,pred_file_path,model_path='./model/bert-large-uncased-seq300-19-7.pt'):
+    def prediction(self,pred_file_path,model_path):
 
         naive_data = pd.read_json(pred_file_path)
         X_pred,Y_pred = parse_json(naive_data)
@@ -182,7 +186,10 @@ class NLI_model():
 
         # for fold_num in range(self.n_fold):
 
-        self.mlp_model = gen_model_net(input_size=[X_pred.shape[-1]],embedding_size=self.embedding_size,dense_layer_size=128)
+        self.mlp_model = gen_model_net(input_size=[X_pred.shape[-1]], dropout_rate=self.dropout_rate,
+                                       dense_layer_size=self.dense_layer_size,
+                                       lambd=self.lambd)
+
         self.mlp_model.load_weights(model_path)
         print("__predict__----------------------------------")
         pred_data = self.mlp_model.predict(x=X_pred,verbose=0)
@@ -207,5 +214,6 @@ if __name__ == "__main__":
     # # model = gen_model_net([4000])
     # plot_model(model,to_file='model_net.png')
 
-    model = NLI_model(19)
-    model.prediction("./data/vector/aug_bert-large-uncased-seq300-19contextual_embedding_gap_pred.json")
+    model = NLI_model()
+    model.train()
+    model.prediction()

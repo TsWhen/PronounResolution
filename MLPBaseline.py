@@ -95,18 +95,23 @@ def gen_MLP_net(input_size,dropout_rate=0.6,dense_layer_size=37,lambd=0.1):
 
 class MLP_model():
 
-    def __init__(self,bert_layer_num,lr=0.001,dropout_rate=0.6,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
+    def __init__(self,bert_layer_num=19,lr=0.001,dense_layer_size=32,dropout_rate=0.6,n_fold=7,batch_size=32,epoch_num=1000,patience=20,lambd=0.1):
 
         self.X_train, self.Y_train, self.X_pred, self.Y_pred = get_train_data(bert_layer_num)
         self.bert_layer_num = bert_layer_num
-        self.mlp_model = gen_MLP_net(input_size=[self.X_train.shape[1]],dropout_rate=dropout_rate,dense_layer_size=37,lambd=lambd)
+        self.dense_layer_size = dense_layer_size
         self.lr = lr
         self.n_fold = n_fold
         self.batch_size = batch_size
         self.epoch_num = epoch_num
         self.patience = patience
+        self.lambd = lambd
+        self.dropout_rate = dropout_rate
 
-        # 设置模型
+        self.mlp_model = gen_MLP_net(input_size=[self.X_train.shape[-1]], dropout_rate=self.dropout_rate,
+                                     dense_layer_size=self.dense_layer_size, lambd=self.lambd)
+
+        # 编译模型
         self.mlp_model.compile(optimizer=optimizers.Adam(lr=self.lr),loss="categorical_crossentropy")
 
     def train(self):
@@ -125,7 +130,7 @@ class MLP_model():
 
 
             callback = [callbacks.EarlyStopping(monitor='val_loss',patience=self.patience,restore_best_weights=False),
-                        callbacks.ModelCheckpoint('./model/bert-large-uncased-seq300-'+str(self.bert_layer_num)+'-'+str(self.n_fold)+'.pt',
+                        callbacks.ModelCheckpoint('./model/MLP_bert-large-uncased-seq300-'+str(self.bert_layer_num)+'-'+str(self.n_fold)+'.pt',
                                                   monitor='val_loss',verbose=0,save_best_only=True,mode='min')]
 
             self.mlp_model.fit(x=train_X,y=train_Y,epochs=self.epoch_num,batch_size=self.batch_size,
@@ -147,33 +152,34 @@ class MLP_model():
         print(val_score_lsit)
         print("pred score:", log_loss(self.Y_pred,pred_result))
 
-    def prediction(self,pred_file_path,model_path='./model/'):
+    def prediction(self,pred_file_path,model_path):
 
         naive_data = pd.read_json(pred_file_path)
         X_pred,Y_pred = parse_json(naive_data)
 
         pred_result = np.zeros((len(X_pred),3))
 
-        for fold_num in range(self.n_fold):
+        # for fold_num in range(self.n_fold):
 
-            self.mlp_model = gen_MLP_net(input_size=[X_pred.shape[-1]],embedding_size=self.embedding_size)
-            self.mlp_model.load_weights(model_path)
+        self.mlp_model = gen_MLP_net(input_size=[X_pred.shape[-1]], dropout_rate=self.dropout_rate,
+                                     dense_layer_size=self.dense_layer_size, lambd=self.lambd)
+        self.mlp_model.load_weights(model_path)
+        print("--------------predict----------------------------------")
+        pred_data = self.mlp_model.predict(x=X_pred, verbose=0)
+        pred_result += pred_data
 
-            pred_data = self.mlp_model.predict(x=X_pred,verbose=0)
-            pred_result += pred_data
+        # pred_result /= self.n_fold
 
-        pred_result /= self.n_fold
-
-        submission_data = pd.read_csv("./data/sample_submission_stage_2.csv",index_col="ID")
-        submission_data["A"] = pred_result[:,0]
-        submission_data["B"] = pred_result[:,1]
-        submission_data["NEITHER"] = pred_result[:,2]
-        submission_data.to_csv("./data/NLI_pred_submission.csv")
+        submission_data = pd.read_csv("./data/sample_submission_stage_2.csv", index_col="ID")
+        submission_data["A"] = pred_result[:, 0]
+        submission_data["B"] = pred_result[:, 1]
+        submission_data["NEITHER"] = pred_result[:, 2]
+        submission_data.to_csv("./data/MLP_pred_submission.csv")
 
 if __name__ == '__main__':
 
-    model = MLP_model(19)
+    model = MLP_model()
     print('----------------------')
-    # model.train()
+    model.train()
     model.prediction()
     print('----------------------')
