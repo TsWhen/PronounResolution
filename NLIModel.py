@@ -150,7 +150,7 @@ class NLI_model():
 
             callback = [callbacks.EarlyStopping(monitor='val_loss', patience=self.patience, restore_best_weights=False),
                         callbacks.ModelCheckpoint(
-                            './model/bert-large-uncased-seq300-' + str(self.bert_layer_num) + '-' + str(
+                            './model/NLI_bert-large-uncased-seq300-' + str(self.bert_layer_num) + '-' + str(
                                 self.n_fold) + '.pt',
                             monitor='val_loss', verbose=0, save_best_only=True, mode='min')]
 
@@ -173,22 +173,22 @@ class NLI_model():
         print(val_score_lsit)
         print("pred score:", log_loss(self.Y_pred, pred_result))
 
-    def prediction(self,pred_file_path,model_path='./model/'):
+    def prediction(self,pred_file_path,model_path='./model/bert-large-uncased-seq300-19-7.pt'):
 
         naive_data = pd.read_json(pred_file_path)
         X_pred,Y_pred = parse_json(naive_data)
 
         pred_result = np.zeros((len(X_pred),3))
 
-        for fold_num in range(self.n_fold):
+        # for fold_num in range(self.n_fold):
 
-            self.mlp_model = gen_model_net(input_size=[X_pred.shape[-1]],embedding_size=self.embedding_size)
-            self.mlp_model.load_weights(model_path)
+        self.mlp_model = gen_model_net(input_size=[X_pred.shape[-1]],embedding_size=self.embedding_size,dense_layer_size=128)
+        self.mlp_model.load_weights(model_path)
+        print("__predict__----------------------------------")
+        pred_data = self.mlp_model.predict(x=X_pred,verbose=0)
+        pred_result += pred_data
 
-            pred_data = self.mlp_model.predict(x=X_pred,verbose=0)
-            pred_result += pred_data
-
-        pred_result /= self.n_fold
+        # pred_result /= self.n_fold
 
         submission_data = pd.read_csv("./data/sample_submission_stage_2.csv",index_col="ID")
         submission_data["A"] = pred_result[:,0]
@@ -208,4 +208,4 @@ if __name__ == "__main__":
     # plot_model(model,to_file='model_net.png')
 
     model = NLI_model(19)
-    model.train()
+    model.prediction("./data/vector/aug_bert-large-uncased-seq300-19contextual_embedding_gap_pred.json")

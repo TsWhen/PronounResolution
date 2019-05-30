@@ -174,5 +174,6 @@ if __name__ == '__main__':
 
     model = MLP_model(19)
     print('----------------------')
-    model.train()
+    # model.train()
+    model.prediction()
     print('----------------------')
